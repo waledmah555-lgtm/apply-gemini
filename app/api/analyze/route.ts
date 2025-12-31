@@ -1,17 +1,29 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-// Initialize OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// CRITICAL FIX: Tell Next.js this route is dynamic and should not be pre-built
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    // 1. Get data from the frontend
-    const { role, experience, country, resume } = await req.json();
+    // Check if the key exists before running
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: "OpenAI API Key is missing on the server." },
+        { status: 500 }
+      );
+    }
 
-    // 2. The System Prompt (The instructions we agreed on)
+    // Initialize OpenAI *inside* the request to be safe
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+
+    // 1. Get data from the frontend
+    const body = await req.json();
+    const { role, experience, country, resume } = body;
+
+    // 2. The System Prompt
     const systemPrompt = `
       You are an honest, senior career mentor specializing in the GCC (Gulf Cooperation Council) job market.
       Analyze the candidate's profile for the role of "${role}" in "${country}" with ${experience} years experience.
@@ -29,20 +41,22 @@ export async function POST(req: Request) {
 
     // 3. Call the AI
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // Cost-effective and fast
+      model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `Here is the resume content:\n${resume}` },
       ],
-      response_format: { type: "json_object" }, // Forces valid JSON
+      response_format: { type: "json_object" },
     });
 
-    // 4. Send the result back to the frontend
-    const result = JSON.parse(completion.choices[0].message.content || "{}");
+    // 4. Send the result back
+    const content = completion.choices[0].message.content;
+    const result = JSON.parse(content || "{}");
+    
     return NextResponse.json(result);
 
   } catch (error) {
-    console.error(error);
+    console.error("Analysis Error:", error);
     return NextResponse.json(
       { error: "Failed to analyze profile." },
       { status: 500 }
