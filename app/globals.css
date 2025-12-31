@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Basic reset to ensure dark mode looks good immediately */
+body {
+  background-color: #020617; /* matches slate-950 */
+  color: #e2e8f0; /* matches slate-200 */
+}
